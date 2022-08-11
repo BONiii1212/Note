@@ -381,3 +381,632 @@ this.new_changeWeather = this.changeWeather.bind(this);
 - 组件挂载：getDerivedStateFromProps、render、componentDidMount
 - 组件更新：getDerivedStateFromProps、shouldComponentUpdata、render、getSnapshotBeforeUpdate、update、componentDidUpdate
 - componentWillUnmount
+
+## 📎ErrorBoundaries
+
+任何未被错误边界捕获的错误都将导致整个React组件树被卸载
+
+实现一个错误边界，需要实现两个生命周期中的任意一个
+
+```javascript
+//会在渲染阶段进行调用，不允许出现副作用
+static getDerivedStateFromError(error)  //用于渲染备用的UI
+//提交阶段被调用，允许执行副作用
+componentDidCatch(error, errorInfo)  //用于打印错误的信息
+```
+
+## 📎dangerouslySetInnerHTML
+
+dangerouslySetInnerHTML是React为浏览器DOM提供innerHTML的替换方案（我猜测是有防止XSS攻击的功能）
+
+将需要显示的内容通过key为__html进行传递
+
+## ⚠️React受控/非受控组件
+
+react的受控组件和非受控组件指的是相对于表单而言的，HTML中表单元素的工作方式和其他的DOM元素有些不同（表单均会保持一些内部的state）
+
+**受控组件：**
+
+如果将React中的state成为表单元素的“唯一数据源”，通过onChange事件和setState事件结合更新state属性，通过这种方式控制取值的表单输入元素叫做“受控组件”
+
+```javascript
+//这种方式，input中输入内容，input并不会更新，因为state并不会变化，只有state能控制input的显示
+const Input = () => {
+	const [username, setUsername] = useState(null)
+	return (
+		<input name = "username" value={username}/>
+	)
+}
+//因此需要使用onChange事件实现“双向绑定”
+const Input = () => {
+	const [username, setUsername] = useState(null)
+	return (
+		<input name = "username" onChange={(event)=>setUsername(event.target.value)} value={username}/>
+	)
+}
+//如果是作为一个组件进行使用，需要将控制权交付到父组件身上
+const Father = () => {
+  const [username, setUsername] = useState()
+  return (
+  	<Input username={username} setUsername={setUsername}>
+  )
+}
+const Input = ({username,setUsername}) => {
+	return (
+		<input name = "username" onChange={(event)=>setUsername(event)} value={username}/>
+	)
+}
+```
+
+react中并没有双向绑定，无法做到用户在输入框中输入内容->数据同步更新，因此需要添加onChange事件来完成这一步
+
+**非受控组件：**
+
+如果表单元素并不是经过state，而是通过ref修改或者直接操作DOM，这种不通过state控制的组件叫做非受控组件
+
+```javascript
+const Input = () => {
+  input = useRef()
+  //通过方法得到input的值
+  const getValue = () => {
+    return input.current.value
+  }
+  return (
+    //通过使用input内置的“state”控制input组件的value，可以通过使用defaultValue指定value的值
+  	<input name="username" ref={input}/>
+  )
+}
+```
+
+## 👑React18新增特性
+
+- **新增Render API**
+
+  因为React18的版本变动较大，为了兼容旧版本，React在挂载根节点处，新增挂载借口，如果使用老接口进行挂载，则不会应用React18的新功能，只有通过新接口挂载才会应用新功能
+
+  ```javascript
+  import {render} from "react-dom"
+  // React 17
+  const container = document.getElementById("app")
+  render(<App tab="home"/>, container)
+  // React 18
+  import {createRoot} from "react-dom/client"
+  const container = document.getElementById("app")
+  const root = createRoot(container) //引入createRoot API用来开启并发渲染模式
+  root.render(<App tab="home"/>)
+  ```
+
+  组件卸载方式
+
+  ```js
+  // React 17
+  ReactDOM.unmountComponentAtNode(root);
+  // React 18
+  root.unmount();
+  ```
+
+  移除了render的回调函数，需要使用useEffect来模拟该功能
+
+- **AutomaticBatching**（自动批处理）
+
+  React 18通过在默认情况下执行批处理来实现开箱即用的性能改进。批处理是指未来获得更好的性能，在数据层，将多个状态更新批量处理，合并成一次更新（视图层将多个渲染合并成一次渲染）
+
+  18之前自动批处理：合成事件、 生命周期钩子
+
+  18之后自动批处理：合成事件、生命周期钩子、promise、setTimeout、原生事件
+
+- **flushSync**
+
+  因为18给几乎所有的地方都添加上了自动批处理，如果想要禁止该功能，可以使用flushSync，每个flushSync包裹起来的setState为一次批量更新
+
+  ```jsx
+  <div
+    onClick={() => {
+      flushSync(() => {
+      	setCount1(count => count + 1);
+      });
+      // 第一次更新
+      flushSync(() => {
+      	setCount2(count => count + 1);
+      });
+      // 第二次更新
+    }}
+  >
+  ```
+
+- **组件卸载警告**
+
+- **React组件的返回值**
+
+  React18中对空组件的返回值，null和undefi均允许
+
+- **Strict Mode**
+
+  严格模式下，React会对每个组件渲染两次
+
+- **Suspense不再需要fallback**
+
+  React18之前 Suspense没有提供fallback属性会被React跳过，React18之后则不会再被跳过了
+
+- **Concurrent Mode**（并发模式）
+
+- **useTransition**
+
+  主要是为了能在大量的任务下也能保持UI响应，可以将setState标记为不紧急渲染，其可以被其他紧急渲染所抢占
+
+- **useDeferredValue**
+
+  将值变成延时状态
+
+## 👑Hooks的原理
+
+Hooks让函数组件也拥有了state
+
+**函数组件的state是存储在哪里的？**
+
+存储在fiber的memoizedState中，通过next串联链表形式进行保存
+
+执行的时候各自在自己的memoizedState上存取数据，完成各种逻辑
+
+**memoizedState中的链表何时进行创建？**
+
+首次useState的时候执行mountState会进行创建（不同的钩子调用不同的mountXXX进行创建，如mountEffect、mountRef、mountMemo等）
+
+后续调用useState只会执行updateState
+
+## 👑mini-useState
+
+```js
+//用于存储state的数组
+let state = [];
+//用于存储set方法的数组
+let setters = [];
+//用于记录页面是否是首次渲染
+let firstRun = true;
+//用于记录指针，连接set方法和state状态
+let cursor = 0;
+//返回创建set方法，使用cursor来指示该set方法可以更改哪个位置的state
+function createSetter(cursor) {
+  return function setterWithCursor(newVal) {
+    state[cursor] = newVal;
+  };
+}
+
+//实现useState函数，
+export function useState(initVal) {
+  //页面首次加载，将state和set方法push进入数组
+  if (firstRun) {
+    state.push(initVal);
+    setters.push(createSetter(cursor));
+    firstRun = false;
+  }
+  //取出state和set方法，返回
+  const setter = setters[cursor];
+  const value = state[cursor];
+  cursor++;
+  return [value, setter];
+}
+
+// Our component code that uses hooks
+function RenderFunctionComponent() {
+  const [firstName, setFirstName] = useState("Rudi"); // cursor: 0
+  const [lastName, setLastName] = useState("Yardley"); // cursor: 1
+
+  return (
+    <div>
+      <button onClick={() => setFirstName("Richard")}>Richard</button>
+      <button onClick={() => setFirstName("Fred")}>Fred</button>
+    </div>
+  );
+}
+
+// This is sort of simulating Reacts rendering cycle
+function MyComponent() {
+  cursor = 0; // resetting the cursor
+  return <RenderFunctionComponent />; // render
+}
+
+console.log(state); // 未渲染：Pre-render: []
+MyComponent();
+console.log(state); // 首次渲染: ['Rudi', 'Yardley']
+MyComponent();
+console.log(state); // 第二次渲染: ['Rudi', 'Yardley']
+console.log(state); // 点击之后: ['Fred', 'Yardley']
+```
+
+## ⚠️useRef
+
+useRef应用场景：
+
+- 用于保存一个变量，使其在组件整个生命周期中不会进行变动
+- 用于安全获取组件的句柄
+
+useRef为什么能够保存一个值在整个生命周期中不会变动
+
+首先所有的hooks都是挂载到fiber对象上的memoizedState上面，并且通过调用mountRef，mountRef中通过创建ref对象，将value赋予对象中的current，将对象的索引赋予memoizedState，其实ref就是用来保存一个对象的索引，这样内部的current的值就不会变动了
+
+一般是配合forwardRef+useImperativeHandle
+
+```javascript
+//函数式组件式不能绑定ref,因为函数组件没有实例，当为类组件时，指向类组件的实例，因此需要使用forwardRef
+//forwardRef用于在函数式组件中传递ref，绑定到子组件中的组件
+const Foo = forwardRef((props,ref)=>{
+    return(
+      <div>
+        <input type="text" ref={ref}/>
+      </div>
+    )
+})
+
+//手动绑定指定的ref
+//forwardRef一般useImperativeHandle，来实现类式组件中，通过ref来调用子组件身上的方法
+const Foo = forwardRef((props,ref)=>{
+  const inputRef = useRef()
+  //强制绑定ref，此时ref就是{focus:function}对象
+  useImperativeHandle(ref,()=>{
+    return {
+      focus:()=>{
+        inputRef.current.focus()
+      }
+    }
+  })
+    return(
+      <div>
+        <input type="text" ref={inputRef}/>
+      </div>
+    )
+})
+```
+
+## 👑useEffect闭包问题
+
+useEffect、useCallback、useMemo均存在闭包问题
+
+```tsx
+export const Test = (){
+  const [num,setNum] = useState(0)
+  const add = () => setNum(num+1)
+  //永远都是0
+  //页面加载的时候会执行一次，形成一个闭包，所以num就是页面加载那个num
+	useEffect(()=>{
+    setInterval(()=>{
+      console.log('num in setInterval:',num)
+    },1000)
+  },[])
+  // 不过怎么按button都是0
+  //页面加载的时候会执行一次，形成一个闭包，所以num就是页面加载那个num
+  useEffect(()=>{
+    return ()=>{
+      console.log(num)
+    }
+  },[])
+  //解决方法：为了让num更新的时候能够让之前生成的闭包销毁，重新生成包含新num的闭包，因此要在依赖中添加num
+  return <div>
+  	<button onClick={add}>add</button>
+    <p>{num}</p>
+  </div>
+}
+```
+
+## ⭐️useEffect/useLayoutEffect
+
+render同步、useLayoutEffect微任务、useEffect宏任务
+
+执行顺序：父组件render>子组件render> 子组件useLayoutEffect>父组件useLayoutEffect>子组件useEffect>父组件useEffect
+
+## ⚠️useCallback/useMemo
+
+**useMemo:**
+
+1.同步（因为是同步所以不能在里面操作DOM之类的副作用）
+
+2.渲染前调用（shouldComponentUpdate功能）
+
+useMemo返回的的是一个值，用于避免在每次渲染时都进行高开销的计算。在子组件中使用 shouldComponentUpdate， 判定该组件的 props 和 state 是否有变化，从而避免每次父组件render时都去重新渲染子组件。
+
+```jsx
+const result = useMemo(() => {
+    for (let i = 0; i < 100000; i++) {
+      (num * Math.pow(2, 15)) / 9;
+    }
+}, [num]);
+```
+
+**useCallback:**
+
+useCallback返回一个函数，当把它返回的这个函数作为子组件使用时，可以避免每次父组件更新时都重新渲染这个子组件。是特殊版本的useMemo
+
+```jsx
+const renderButton = useCallback(
+     () => (
+         <Button type="link">
+            {buttonText}
+         </Button>
+     ),
+     [buttonText]    // 当buttonText改变时才重新渲染renderButton
+);
+```
+
+## ⚠️useEvent
+
+**useEvent：**
+
+解决useCallback的闭包问题：
+
+- 函数在整个生命周期内永久存活
+- 保证拿到最新的state
+
+老版本中React为了解决该问题提出的方案
+
+```javascript
+function useEventCallback(fn, dependencies) {
+  const ref = useRef(() => {
+    throw new Error('Cannot call an event handler while rendering.');
+  });
+
+  useEffect(() => {
+    ref.current = fn;
+  }, [fn, ...dependencies]);
+
+  return useCallback(() => {
+    //通过ref保存方法的饮用，就可以避免闭包问题
+    const fn = ref.current;
+    return fn();
+  }, [ref]);
+}
+```
+
+RDC功能中可以使用useEvent
+
+**useEvent中到底使用useLayoutEffect还是useEffect**
+
+均不符合预期，由于父组件将使用useEvent包裹的函数通过props传递给子组件时，由于执行顺序为
+
+父组件render>子组件render> 子组件useLayoutEffect>父组件useLayoutEffect>子组件useEffect>父组件useEffect
+
+因此子组件的render和useLayoutEffect均在useEvent将函数赋予ref之前，如果在这两个阶段读取props中的函数，将会不符合期望
+
+答：就算是使用useLayoutEffect和useEffect均会出现不符合预期的结果，目前第三方的Hooks实现都是放在render中的
+
+```js
+function useEventCallback(fn, dependencies) {
+  const ref = useRef(() => {
+    throw new Error('Cannot call an event handler while rendering.');
+  });
+	// 不包裹任何副作用，ref在父组件进行render的时候就赋值了
+  ref.current = fn;
+
+  return useCallback(() => {
+    //通过ref保存方法的饮用，就可以避免闭包问题
+    const fn = ref.current;
+    return fn();
+  }, [ref]);
+}
+```
+
+## 📎useState惰性渲染
+
+函数签名：
+
+```tsx
+function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];
+```
+
+添加函数只是惰性渲染。`initialState` 参数只会在组件的初始渲染中起作用，后续渲染时会被忽略。如果初始 state 需要通过复杂计算获得，则可以传入一个函数，在函数中计算并返回初始的 state，此函数只在初始渲染时被调用.
+
+所以要在useState中保存函数，则需要再加一层函数
+
+```tsx
+const [fun, setfun] = React.useState(()=>()=>{console.log('我是初始化函数')}
+```
+
+## 📎setState两种写法
+
+```tsx
+const [state, setState] = useState({
+  stat:"idle"
+})
+//但是这样写涉及了state，如果放在useEffect中，并且state放入依赖中，就回导致无限渲染
+useEffect(()=>{
+  setState({...state, stat:"loading"})
+},[state])
+//安全写法useReducer用的就是这种写法
+//这样不会直接涉及到state
+setState(prevState => ({...prevState, stat: "loading"}))
+```
+
+## ⭐️useReducer
+
+是useState的替代方案。使用useReduce可以将操作状态的实现交给reducer，使用者只需要提供action（操作状态的方法的别名和所需要提供的数据即可）
+
+useState适合定义单个状态，useReducer适合定义一群会互相影响的状态。
+
+```tsx
+import { useCallback, useReducer } from "react";
+
+const UNDO = "UNDO";
+const REDO = "REDO";
+const SET = "SET";
+const RESET = "RESET";
+
+type State<T> = {
+  past: T[];
+  present: T;
+  future: T[];
+};
+
+type Action<T> = {
+  newPresent?: T;
+  type: typeof UNDO | typeof REDO | typeof SET | typeof RESET;
+};
+//（state,action）=>newState的reducer
+//state是现在的state值，action是操作方法和需要的数据，需要返回新的state的值
+const undoReducer = <T>(state: State<T>, action: Action<T>) => {
+  //下面就是所有操作state的方法
+  const { past, present, future } = state;
+  const { newPresent } = action;
+	//配套的dipatch的方法，工作机制类似于setState的第二种用法
+  switch (action.type) {
+    case UNDO: {
+      if (past.length === 0) return state;
+
+      const previous = past[past.length - 1];
+      const newPast = past.slice(0, past.length - 1);
+
+      return {
+        past: newPast,
+        present: previous,
+        future: [present, ...future],
+      };
+    }
+
+    case REDO: {
+      if (future.length === 0) return state;
+
+      const next = future[0];
+      const newFuture = future.slice(1);
+
+      return {
+        past: [...past, present],
+        present: next,
+        future: newFuture,
+      };
+    }
+
+    case SET: {
+      if (newPresent === present) {
+        return state;
+      }
+      return {
+        past: [...past, present],
+        present: newPresent,
+        future: [],
+      };
+    }
+
+    case RESET: {
+      return {
+        past: [],
+        present: newPresent,
+        future: [],
+      };
+    }
+  }
+  return state;
+};
+
+export const useUndo = <T>(initialPresent: T) => {
+  //useReducer有两个参数，第一个是上面定义的undoReducer，另一个是状态的初始值
+  const [state, dispatch] = useReducer(undoReducer, {
+    past: [],
+    present: initialPresent,
+    future: [],
+  } as State<T>);
+
+  const canUndo = state.past.length !== 0;
+  const canRedo = state.future.length !== 0;
+
+  const undo = useCallback(() => dispatch({ type: UNDO }), []);
+
+  const redo = useCallback(() => dispatch({ type: REDO }), []);
+
+  const set = useCallback(
+    (newPresent: T) => dispatch({ type: SET, newPresent }), []);
+
+  const reset = useCallback(
+    (newPresent: T) => dispatch({ type: RESET, newPresent }), []);
+
+  return [state, { set, reset, undo, redo, canUndo, canRedo }] as const;
+};
+```
+
+## 👑useEffect模拟生命周期
+
+```js
+//仅在首次渲染之后进行执行（仅执行一次）
+useEffect(()=>{
+    console.log('hello')
+},[])
+```
+
+```js
+//每次页面渲染都会执行
+useEffect(()=>{
+    console.log('hello')
+})
+```
+
+```js
+//监听num，num变化的时候才会执行
+useEffect(()=>{
+    console.log('hello')
+},[num])
+```
+
+```js
+//模拟componentDidMount
+useEffect(()=>{
+    console.log('componentDidMount')
+},[])
+//模拟componentWillUnmount
+useEffect(()=>{
+    return ()=>{
+        console.log('componentWillUnmount')
+    }
+})
+//模拟componentDidUpdate
+const useMounted = () => {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        !mounted && setMounted(true);
+        return () => setMounted(false);
+    }, []);
+    return mounted;
+}
+const mounted = useMounted() 
+useEffect(() => {
+    mounted && fn()
+})
+```
+
+## 📎函数/类组件setState的区别
+
+**类式组件**
+
+```javascript
+this.state = {
+  name:'lyb',
+  age:14
+}
+changeState = () => {
+  this.setState({name:'qxl'}) //自动合并，并生成新的对象
+}
+```
+
+**函数式组件**
+
+```javascript
+const [state, setState] = useState({
+  name:'lyb',
+  age:14
+})
+const changeState = () => {
+	setState({age:13})//直接进行替换，并不会合并，因此在使用函数式组件的setState的时候一般会使用到Object.assign
+  //setState(Object.assign({},{...state,name:'qxl'}))
+}
+```
+
+## 📎Portal
+
+提供一种将子节点渲染到存在于父组件以外的DOM节点的优秀方案
+
+```javascript
+//第一个child是任何可渲染的React子元素，字符串或fragment，第二个参数container是DOM元素
+ReactDOM.createPortal(child, container)
+```
+
+通常情况下子组件将会被渲染在离他最近的父组件下，但是当父组件有overflow：hidden或者z-index的时候，子组件的显示将会受到影响（例如对话框、悬浮卡和提示框等），需要脱离父类css的样式
+
+通过protal将元素放置DOM树中的任何位置，但是其其他行为和普通的React字节点行为一样，protal仍然能够在React树中进行，尽管这些React树的祖先不是DOM树中的祖先
+
+因此Protal可以脱离父组件的css样式的影响，又可以保持原有的事件处理能力
